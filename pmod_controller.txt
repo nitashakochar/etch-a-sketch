@@ -1,0 +1,129 @@
+----------------------------------------------------------------------------------
+-- Company: ENGS 31 17X
+-- Engineer: Nitasha Kochar & Regina Yan
+-- 
+-- Create Date: 08/16/2017 04:00:15 PM
+-- Design Name: 
+-- Module Name: pmod_controller - Behavioral
+-- Project Name: 
+-- Target Devices: 
+-- Tool Versions: 
+-- Description: Determines in which direction the pmod rotary encoder is turned
+-- 
+-- Dependencies: 
+-- 
+-- Revision:
+-- Revision 0.01 - File Created
+-- Additional Comments:
+-- 
+----------------------------------------------------------------------------------
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+-- Uncomment the following library declaration if using
+-- arithmetic functions with Signed or Unsigned values
+--use IEEE.NUMERIC_STD.ALL;
+
+-- Uncomment the following library declaration if instantiating
+-- any Xilinx leaf cells in this code.
+--library UNISIM;
+--use UNISIM.VComponents.all;
+
+entity pmod_controller is
+    Port ( A : in STD_LOGIC; --signal
+           B : in STD_LOGIC; --signal
+           LEFT : out STD_LOGIC;
+           RIGHT : out STD_LOGIC;
+           clk : in STD_LOGIC);
+end pmod_controller;
+
+architecture Behavioral of pmod_controller is
+
+type state_type is (idle, R1, R2, R3, L1, L2, L3, inc, dec);
+signal curr_state, next_state: state_type;
+
+begin
+
+FSM_state_update: process(clk)
+begin
+  if rising_edge(clk) then
+    curr_state <= next_state;
+  end if;
+end process;
+
+FSM: process(curr_state, A,B)
+begin
+next_state <= curr_state;
+LEFT <= '0';
+RIGHT <= '0';
+
+case curr_state is 
+    when idle =>
+        if A = '0' then
+            next_state <= L1;
+        elsif B = '0' then
+            next_state <= R1;
+        else
+            next_state <= idle;
+        end if;
+    when L1 =>
+        if B = '0' then
+            next_state <= L2;
+        elsif A = '1' then
+            next_state <= idle;
+        else
+            next_state <= L1;
+        end if;
+    when L2 => 
+        if A = '1' then
+            next_state <= L3;
+        elsif B = '1' then
+            next_state <= L1;
+        else
+            next_state <= L2;
+        end if;
+    when L3 =>
+        if B = '1' then
+            next_state <= dec;
+        elsif A = '0' then
+            next_state <= L2;
+        else
+            next_state <= L3;
+        end if;
+    when dec =>
+        LEFT <= '1';		-- left turn ensured
+        next_state <= idle;
+        
+    when R1 =>
+        if A = '0' then
+            next_state <= R2;
+        elsif B = '1' then
+            next_state <= idle;
+        else
+            next_state <= R1;
+        end if;
+    when R2 =>
+        if B = '1' then
+            next_state <= R3;
+        elsif A = '1' then
+            next_state <= R1;
+        else
+            next_state <= R2;
+        end if;
+    when R3 =>
+        if A = '1' then
+            next_state <= inc;
+        elsif B = '0' then
+            next_state <= R2;
+        else
+            next_state <= R3;
+        end if;
+    when inc =>
+        RIGHT <= '1';		-- right turn ensured
+        next_state <= idle;
+            
+end case;
+end process;
+end Behavioral;

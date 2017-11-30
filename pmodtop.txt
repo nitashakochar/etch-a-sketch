@@ -1,0 +1,91 @@
+----------------------------------------------------------------------------------
+-- Company: ENGS 31 17X
+-- Engineer: Nitasha Kochar & Regina Yan
+-- 
+-- Create Date: 08/16/2017 07:47:27 PM
+-- Design Name: 
+-- Module Name: PMODtop - Behavioral
+-- Project Name: 
+-- Target Devices: 
+-- Tool Versions: 
+-- Description: Debouncer ensures that rotary encoders result in one single turn in
+-- 		any direction
+-- 
+-- Dependencies: PMODdebouncer and pmod_controller
+-- 
+-- Revision:
+-- Revision 0.01 - File Created
+-- Additional Comments:
+-- 
+----------------------------------------------------------------------------------
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+
+entity PMODtop is
+    Port ( clk : in STD_LOGIC;
+           A_vertical : in STD_LOGIC;
+           B_vertical : in STD_LOGIC;
+           A_horizontal : in STD_LOGIC;
+           B_horizontal : in STD_LOGIC;
+           LEFT : out STD_LOGIC;
+           RIGHT : out STD_LOGIC;
+           UP : out STD_LOGIC;
+           DOWN : out STD_LOGIC);
+end PMODtop;
+
+architecture Behavioral of PMODtop is
+signal u_A_horizontal, u_A_vertical, u_B_horizontal, u_B_vertical: std_logic;
+
+component PMODdebouncer
+	Port( 	clk	: in STD_LOGIC;
+	        switch : in STD_LOGIC;
+            dbswitch : out STD_LOGIC );
+end component;
+
+
+component pmod_controller
+    Port ( A : in STD_LOGIC; --signal
+           B : in STD_LOGIC; --signal
+           LEFT : out STD_LOGIC;
+           RIGHT : out STD_LOGIC;
+           clk : in STD_LOGIC);
+end component;
+begin
+
+A_horizontal_DB: PMODdebouncer
+    Port map( clk => clk,
+              switch => A_horizontal,
+              dbswitch => u_A_horizontal);
+
+A_vertical_DB: PMODdebouncer
+    Port map( clk => clk,
+              switch => A_vertical,
+              dbswitch => u_A_vertical);
+              
+B_horizontal_DB: PMODdebouncer
+    Port map( clk => clk,
+              switch => B_horizontal,
+              dbswitch => u_B_horizontal);
+
+B_vertical_DB: PMODdebouncer
+    Port map( clk => clk,
+              switch => B_vertical,
+              dbswitch => u_B_vertical);
+
+Vertical_controller: pmod_controller
+    Port map( A => u_A_vertical,
+              B => u_B_vertical,
+              LEFT => DOWN,
+              RIGHT => UP,
+              clk => clk);          
+
+Horizontal_controller: pmod_controller
+    Port map( A => u_A_horizontal,
+              B => u_B_horizontal,
+              LEFT => LEFT,
+              RIGHT => RIGHT,
+              clk => clk);
+end Behavioral;

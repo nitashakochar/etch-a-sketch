@@ -1,0 +1,223 @@
+----------------------------------------------------------------------------------
+-- Company: ENGS 31 17X
+-- Engineer: Nitasha Kochar & Regina Yan
+-- 
+-- Create Date: 08/15/2017 04:56:15 PM
+-- Module Name: Etch_A_Sketch - Behavioral
+-- Project Name: Etch_A_Sketch
+-- Target Devices: 
+-- Tool Versions: 
+-- Description: 
+-- 
+-- Dependencies: Etch a Sketch game that allows users to draw pixels on the screen 
+-- 				 with pmod rotary encoders
+-- Revision:
+-- Revision 0.01 - File Created
+-- Additional Comments:
+-- 
+----------------------------------------------------------------------------------
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+use IEEE.NUMERIC_STD.ALL;
+library UNISIM;
+use UNISIM.VComponents.all;
+
+entity Etch_A_Sketch is
+    port(   mclk : in STD_LOGIC;
+            color_bit_1, color_bit_2: in STD_LOGIC; --input color
+            A_vertical : in STD_LOGIC;		
+            B_vertical : in STD_LOGIC;
+            A_horizontal : in STD_LOGIC;
+            B_horizontal : in STD_LOGIC;
+            Red0 : out STD_LOGIC;
+            Red1 : out STD_LOGIC;
+            Red2 : out STD_LOGIC;
+            Red3: out STD_LOGIC;
+            Green0 : out STD_LOGIC;
+            Green1 : out STD_LOGIC;
+            Green2 : out STD_LOGIC;
+            Green3: out STD_LOGIC;
+            Blue0 : out STD_LOGIC;
+            Blue1 : out STD_LOGIC;
+            Blue2: out STD_LOGIC;
+            Blue3: out STD_LOGIC;
+            h_sync_1, v_sync_1 : out std_logic;
+            seg : out STD_LOGIC_VECTOR (0 to 6);
+            dp : out std_logic;
+            an : out std_logic_vector(3 downto 0));
+             
+end Etch_A_Sketch;
+
+architecture Behavioral of Etch_A_Sketch is
+
+component VGA is
+    Port ( clk : in STD_LOGIC;
+           v_sync : out STD_LOGIC;
+           h_sync : out STD_LOGIC;
+           video_on : out STD_LOGIC;
+           pixel_x : out STD_LOGIC_VECTOR(9 downto 0);
+           pixel_y : out STD_LOGIC_VECTOR(9 downto 0));
+end component;
+
+
+component PMODtop is
+    Port ( clk : in STD_LOGIC;
+           A_vertical : in STD_LOGIC;
+           B_vertical : in STD_LOGIC;
+           A_horizontal : in STD_LOGIC;
+           B_horizontal : in STD_LOGIC;
+           LEFT : out STD_LOGIC;
+           RIGHT : out STD_LOGIC;
+           UP : out STD_LOGIC;
+           DOWN : out STD_LOGIC);
+end component;
+
+component pixel_location is
+  Port ( clk : in std_logic;
+         LEFT, RIGHT, UP, DOWN: in std_logic;
+         WE: out std_logic;
+         video_on: in std_logic;
+         color_in_1, color_in_2 : in std_logic;
+         color_out : out std_logic_vector(1 downto 0);
+         pixel_x_location, pixel_y_location : out std_logic_vector(9 downto 0) );
+end component;
+
+component Memory is
+    Port ( clk          : in STD_LOGIC;
+           WR_pixel_x : in STD_LOGIC_VECTOR(9 DOWNTO 0);
+           WR_pixel_y : in STD_LOGIC_VECTOR(9 DOWNTO 0);
+           RD_pixel_x : in STD_LOGIC_VECTOR(9 DOWNTO 0);
+           RD_pixel_y : in STD_LOGIC_VECTOR(9 DOWNTO 0);
+           Data_in : in STD_LOGIC_VECTOR(1 DOWNTO 0); 
+           WR_enable : in STD_LOGIC;
+           Data_out : out STD_LOGIC_VECTOR(11 DOWNTO 0)); 
+end component;
+
+component mux7seg is
+    Port ( clk : in  STD_LOGIC;									
+           y0, y1, y2, y3 : in  STD_LOGIC_VECTOR (3 downto 0);	-- digits
+           dp_set : in std_logic_vector(3 downto 0);            -- decimal points
+           seg : out  STD_LOGIC_VECTOR(0 to 6);			-- segments (a...g)
+           dp : out std_logic;
+           an : out  STD_LOGIC_VECTOR (3 downto 0) );			
+end component;
+
+signal v_sync : std_logic := '0';
+signal h_sync : std_logic := '0';
+signal u_video_on : std_logic := '0';
+signal pixel_x: std_logic_vector(9 downto 0) := "0000000000";
+signal pixel_y: std_logic_vector(9 downto 0) := "0000000000";
+signal row, column : std_logic_vector(9 downto 0);
+signal u_color: std_logic_vector(11 downto 0);
+
+constant CLOCK_DIVIDER_VALUE: integer := 2;
+signal clkdiv: unsigned(0 downto 0) := "0";
+signal clkdiv_tog: std_logic := '0';signal clk: std_logic := '0';
+
+signal read_x, read_y, write_x, write_y: std_logic_vector(9 downto 0);
+signal color_in: std_logic_vector(1 downto 0);
+signal turn: std_logic;
+signal u_left, u_right, u_up, u_down: std_logic;
+signal write_x_temp: std_logic_vector(3 downto 0) := "00" & write_x(9 downto 8);
+
+begin
+slow_clock_buffer: BUFG
+    port map (I => clkdiv_tog,
+              O => clk);
+              
+clock_divider: process(mclk)
+begin
+    if rising_edge(mclk) then
+        if clkdiv = CLOCK_DIVIDER_VALUE-1 then
+            clkdiv_tog <= NOT(clkdiv_tog);
+            clkdiv <= (others => '0');
+        else
+            clkdiv <= clkdiv + 1;
+        end if; 
+    end if;
+end process;                 
+
+vga_display: VGA port map(
+    clk => clk,
+    v_sync => v_sync_1,
+    h_sync => h_sync_1,
+    video_on => u_video_on,
+    pixel_x => read_x,
+    pixel_y => read_y);
+    
+pmod: PMODtop
+        port map( clk => clk,
+                  A_vertical => A_vertical,
+                  B_vertical => B_vertical,
+                  A_horizontal => A_horizontal,
+                  B_horizontal => B_horizontal,
+                  LEFT => u_left, 
+                  RIGHT => u_right,
+                  UP => u_down,
+                  DOWN => u_up);
+
+pixel_locator: pixel_location
+  port map( clk => clk,
+            LEFT => u_left,
+            RIGHT => u_right,
+            UP => u_up,
+            DOWN => u_down,
+            video_on => u_video_on, 
+            WE => turn,
+            color_out => color_in,
+            color_in_1 => color_bit_1,
+            color_in_2 => color_bit_2,
+            pixel_x_location => write_x,
+            pixel_y_location => write_y);
+
+our_memory: Memory
+    port map( clk => clk,
+              WR_pixel_x => write_x,
+              WR_pixel_y => write_y,
+              RD_pixel_x => read_x,
+              RD_pixel_y => read_y,
+              Data_in => color_in,
+              WR_enable => turn,
+            Data_out(11) =>  u_color(11),
+            Data_out(10) => u_color(10),
+            Data_out (9) => u_color(9),
+            Data_out(8) =>  u_color(8),
+            Data_out(7) => u_color(7),
+            Data_out(6) => u_color(6),
+            Data_out(5) => u_color(5),
+            Data_out(4) => u_color(4),
+            Data_out(3) => u_color(3),
+            Data_out(2) => u_color(2),
+            Data_out(1) => u_color(1),
+            Data_out(0) => u_color(0));
+            
+display: mux7seg port map(
+            clk=>mclk,            -- has its own clock divider built-in
+            y0=>"0000",
+            y1=>write_x(3 downto 0),
+            y2=>write_x(7 downto 4),
+             y3=>write_x_temp,
+            dp_set=>"0000",
+            seg=>seg, 
+            dp=>dp, 
+            an=>an);
+
+  
+Red0 <= u_color(11);
+Red1 <= u_color(10);
+Red2 <= u_color(9);
+Red3 <= u_color(8);  
+Green0 <= u_color(7);
+Green1 <= u_color(6);
+Green2 <= u_color(5);
+Green3 <= u_color(4);
+Blue0 <= u_color(3);
+Blue1 <= u_color(2);
+Blue2 <= u_color(1);
+Blue3 <= u_color(0);
+
+
+end Behavioral;

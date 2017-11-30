@@ -1,0 +1,117 @@
+----------------------------------------------------------------------------------
+-- Company: ENGS 31 17X
+-- Engineer: Nitasha Kochar & Regina Yan
+-- 
+-- Create Date: 08/14/2017 03:03:43 PM
+-- Design Name: 
+-- Module Name: VGA - Behavioral
+-- Project Name: 
+-- Target Devices: 
+-- Tool Versions: 
+-- Description: 
+-- 
+-- Dependencies: 
+-- 
+-- Revision:
+-- Revision 0.01 - File Created
+-- Additional Comments:
+-- 
+----------------------------------------------------------------------------------
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+use IEEE.NUMERIC_STD.ALL;
+
+library UNISIM;
+use UNISIM.VComponents.all;
+
+entity VGA is
+    Port ( clk : in STD_LOGIC;
+           V_sync : out STD_LOGIC;
+           H_sync : out STD_LOGIC;
+           video_on : out STD_LOGIC;
+           pixel_x : out STD_LOGIC_VECTOR(9 downto 0);
+           pixel_y : out STD_LOGIC_VECTOR(9 downto 0));
+end VGA;
+
+architecture Behavioral of VGA is
+
+signal H_video_on: STD_LOGIC := '0';
+signal V_video_on: STD_LOGIC := '0';
+
+-- VGA Constants given in example
+constant left_border : integer := 48;
+constant h_display : integer := 640;
+constant right_border : integer := 16;
+constant h_retrace: integer := 96;
+constant HSCAN : integer := left_border + h_display + right_border + h_retrace - 1;
+
+constant top_border: integer := 29;
+constant v_display : integer := 480;
+constant bottom_border : integer := 10;
+constant v_retrace : integer := 2;
+constant VSCAN : integer := top_border + v_display + bottom_border + v_retrace - 1;
+
+-- internal signal
+signal tc: std_logic;
+signal h_counter, v_counter: integer := 0;
+
+
+begin
+Hsync_proc: process(clk)
+begin
+    if rising_edge(clk) then
+        h_sync <= '1';
+        h_video_on <= '0';
+        tc <= '0';
+            if h_counter < h_display then
+                h_counter <= h_counter + 1;
+            elsif (h_counter >= h_display) and (h_counter < h_display + right_border) then -- front porch
+                h_video_on <= '1';
+                h_counter <= h_counter + 1;
+            elsif (h_counter >= h_display + right_border) and (h_counter < h_display + right_border + h_retrace) then -- retracing
+                h_sync <= '0';
+                h_video_on <= '1';
+                h_counter <= h_counter + 1;
+            elsif (h_counter >= h_display + right_border + h_retrace) and (h_counter < HSCAN) then -- back porch
+                h_video_on <= '1';
+                h_counter <= h_counter + 1;
+            elsif (h_counter = HSCAN) then
+                h_video_on <= '1';
+                tc <= '1';
+                h_counter <= 0;
+            end if;                
+    end if;
+end process;
+
+Vsync_proc: process(clk, tc)
+begin
+    if rising_edge(clk) and (tc = '1') then
+    v_sync <= '1';
+    v_video_on <= '0';
+        if v_counter < v_display then
+            v_counter <= v_counter + 1;
+        elsif (v_counter >= v_display) and (v_counter < v_display + bottom_border) then -- front porch
+            v_video_on <= '1';
+            v_counter <= v_counter + 1;
+        elsif (v_counter >= v_display + bottom_border) and (v_counter < v_display + bottom_border + v_retrace) then --retracing
+            v_sync <= '0';
+            v_video_on <= '1';
+            v_counter <= v_counter + 1;
+        elsif (v_counter >= v_display + bottom_border + v_retrace) and (v_counter < VSCAN) then -- back porch
+            v_video_on <= '1';
+            v_counter <= v_counter + 1;
+        elsif (v_counter = VSCAN) then
+            v_video_on <= '1';
+            v_counter <= 0;
+        end if;
+    end if;
+end process;
+
+pixel_x <= std_logic_vector(to_unsigned(h_counter,10));
+pixel_y <= std_logic_vector(to_unsigned(v_counter,10));
+video_on <= H_video_on and V_video_on;
+
+end Behavioral;

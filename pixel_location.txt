@@ -1,0 +1,139 @@
+----------------------------------------------------------------------------------
+-- Company: ENGS 31 17X
+-- Engineer: Nitasha Kochar & Regina Yan
+-- 
+-- Create Date: 08/18/2017 02:45:12 PM
+-- Design Name: 
+-- Module Name: pixel_location - Behavioral
+-- Project Name: 
+-- Target Devices: 
+-- Tool Versions: 
+-- Description: Determines location of next pixel and assigns it an address and 
+--		color in memory
+-- 
+-- Dependencies: 
+-- 
+-- Revision:
+-- Revision 0.01 - File Created
+-- Additional Comments:
+-- 
+----------------------------------------------------------------------------------
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+
+use IEEE.NUMERIC_STD.ALL;
+
+
+entity pixel_location is
+  Port ( clk : in std_logic;
+         LEFT, RIGHT, UP, DOWN: in std_logic;
+         WE: out std_logic;
+         color_in_1, color_in_2 : in std_logic;
+         color_out : out std_logic_vector(1 downto 0);
+         pixel_x_location, pixel_y_location : out std_logic_vector(9 downto 0);
+         video_on: in std_logic );
+end pixel_location;
+
+architecture Behavioral of pixel_location is
+
+type state_type is (idle, LEFT_ROW, DOWN_COL, RIGHT_ROW, UP_COL, waiting, writing);
+signal curr_state, next_state: state_type;
+signal row_update_dec, col_update_dec, row_update_inc, col_update_inc: std_logic;
+signal v_counter: unsigned(9 downto 0):= "0011101111";	-- y location of center point of screen
+signal h_counter: unsigned(9 downto 0):= "0100111111";	-- x location of center point of screen
+
+
+begin
+
+FSM_state_update: process(clk)
+begin
+  if rising_edge(clk) then
+    curr_state <= next_state;
+  end if;
+end process;
+
+pixel_location: process(curr_state, LEFT, DOWN, RIGHT, UP, video_on)
+begin
+row_update_dec <= '0';
+col_update_dec <= '0';
+row_update_inc <= '0';
+col_update_inc <= '0';
+next_state <= curr_state;
+WE<='0';
+    case curr_state is
+        when idle =>       
+            if DOWN = '1' then
+                next_state <= DOWN_COL;
+            elsif UP = '1' then
+                next_state <= UP_COL;
+            elsif LEFT = '1' then
+                next_state <= LEFT_ROW;
+            elsif RIGHT = '1' then
+                next_state <= RIGHT_ROW;
+            end if;
+        when LEFT_ROW =>
+            row_update_dec <= '1'; 
+            next_state <= waiting;
+        when RIGHT_ROW =>
+            row_update_inc <= '1';
+            next_state <= waiting;
+        when DOWN_COL =>
+            col_update_dec <= '1';
+            next_state <= waiting;
+        when UP_COL => 
+            col_update_inc <= '1';
+            next_state <= waiting;
+        when waiting =>
+            if video_on = '0' then
+                next_state <= writing;
+           end if;
+        when writing =>
+            WE <= '1';
+                next_state <= idle;
+        end case;
+end process;
+
+
+location_update: process(clk)
+begin
+v_counter <= v_counter;
+h_counter <= h_counter;
+if rising_edge(clk) then
+        if col_update_dec = '1' then
+            if v_counter = "0000000000" then
+                v_counter <= "1111111111";
+             else
+            v_counter <= v_counter - 1;
+            end if;
+        elsif col_update_inc = '1' then
+            if v_counter = "1111111111" then
+                v_counter <= "0000000000";
+            else
+                 v_counter <= v_counter + 1;
+             end if;    
+        elsif row_update_dec = '1' then
+            if h_counter = "0000000000" then
+                h_counter <= "1111111111";
+            else
+                h_counter <= h_counter - 1;
+            end if;
+        elsif row_update_inc = '1' then
+            if h_counter = "1111111111" then
+                h_counter <= "0000000000";
+            else
+                h_counter <= h_counter + 1;
+            end if;
+        end if;
+    end if;
+end process;
+
+
+color_out <= color_in_1 & color_in_2;
+pixel_x_location <= std_logic_vector(h_counter); --address of pixel location in memory
+pixel_y_location <= std_logic_vector(v_counter);
+end Behavioral;
+
+

@@ -1,0 +1,80 @@
+----------------------------------------------------------------------------------
+-- Company: ENGS 31 17X
+-- Engineer: Nitasha Kochar & Regina Yan
+-- 
+-- Create Date: 08/16/2017 03:34:30 PM
+-- Design Name: 
+-- Module Name: Memory - Behavioral
+-- Project Name: 
+-- Target Devices: 
+-- Tool Versions: 
+-- Description: 
+-- 
+-- Dependencies: 
+-- 
+-- Revision:
+-- Revision 0.01 - File Created
+-- Additional Comments:
+-- 
+----------------------------------------------------------------------------------
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+use IEEE.NUMERIC_STD.ALL;
+
+entity Memory is
+    Port ( clk        : in STD_LOGIC;
+           WR_pixel_x : in STD_LOGIC_VECTOR(9 DOWNTO 0);
+           WR_pixel_y : in STD_LOGIC_VECTOR(9 DOWNTO 0);
+           RD_pixel_x : in STD_LOGIC_VECTOR(9 DOWNTO 0);
+           RD_pixel_y : in STD_LOGIC_VECTOR(9 DOWNTO 0);
+           Data_in : in STD_LOGIC_VECTOR(1 DOWNTO 0); --4 colors, represented by 2 bits
+           WR_enable : in STD_LOGIC;
+           Data_out : out STD_LOGIC_VECTOR(11 DOWNTO 0)); --12 bit color
+end Memory;
+
+architecture Behavioral of Memory is
+constant RAM_ADDR_LEN: integer := 14;
+constant RAM_WIDTH: integer :=2;
+type RAM_TYPE is array(2**RAM_ADDR_LEN-1 downto 0) of std_logic_vector(1 downto 0); --create memory array 
+signal our_ram: RAM_TYPE;
+signal temp_color   : std_logic_vector(1 downto 0) := "00";  
+constant GREEN		: std_logic_vector(11 downto 0) := "000011110000";
+constant CYAN		: std_logic_vector(11 downto 0)  := "000011111111";
+constant PURPLE	    : std_logic_vector(11 downto 0) := "111100001111";
+constant BLACK		: std_logic_vector(11 downto 0) := "000000000000";
+signal WR_addr, RD_addr : std_logic_vector(13 downto 0);
+
+
+begin
+
+WR_addr <= WR_pixel_y(9 downto 3) & WR_pixel_x(9 downto 3); --bit location stored here
+RD_addr <= RD_pixel_y(9 downto 3) & RD_pixel_x(9 downto 3);
+
+clock_process: process(clk)
+begin
+if rising_edge(clk) then
+    if WR_enable = '1' then
+        our_ram(to_integer(unsigned(WR_addr))) <= Data_in; --writing into address for our data_in
+    end if;
+end if;
+end process;
+
+color_chooser: process(temp_color)
+begin
+    if temp_color = "00" then
+        Data_out <= BLACK;
+    elsif temp_color = "01" then
+        Data_out <= GREEN;
+    elsif temp_color = "10" then
+        Data_out <= CYAN;
+    else
+        Data_out <= PURPLE;
+    end if;
+end process;
+
+
+temp_color  <= our_ram(to_integer(unsigned(RD_addr))); --reading
+end Behavioral;
